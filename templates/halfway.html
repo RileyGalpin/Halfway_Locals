@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midpoint Finder</title>
+</head>
+<body>
+  <h1>Enter Two Addresses</h1>
+  <form method="post" action="/">
+    Address 1: <input id="addr1" type="text" name="address1" required><br>
+    Driver 1 radius: <input type="number" placeholder="5" value="5" name="driver1"><br><br>
+    Address 2: <input id="addr2" type="text" name="address2" required><br>
+    Driver 2 radius: <input type="number" placeholder="5" value="5" name="driver2"><br><br>
+    Place Type: <input id="place" type="text" name="place" value="restaurant" required><br><br>
+    
+    <p>Please select units:</p>
+    <input type="radio" id="Miles" name="unit" value="imperial" checked>
+    <label for="Miles">Miles</label><br>
+    <input type="radio" id="Kilometers" name="unit" value="metric">
+    <label for="Kilometers">Kilometers</label><br>
+    <input type="submit" value="Submit">
+  </form>
+<!--
+  {% if places %}
+  <h3>Suggested Places Near Midpoint:</h3>
+  <ul>
+    {% for place in places %}
+      <li><strong>{{ place.name }}</strong> <br>
+          Location: {{ place.location.lat }}, {{ place.location.lng }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+-->
+  
+  <div id="map" style="height: 400px; width: 100%; margin-top: 20px;"></div>
+  <div id="coordinates" data-lat="{{ midpoint_lat }}" data-lng="{{ midpoint_long }}"></div>
+  <div id="drivers" driver1="{{ driver1 }}" driver2="{{ driver2 }}"></div>
+  <div id="places-data" data-places='{{ places | default([])| tojson | safe }}'></div>
+  <div id="coord1" coord1='{{ coord1 | tojson | safe }}'></div>
+  <div id="coord2" coord2='{{ coord2 | tojson | safe }}'></div>
+   
+  <script>
+    // Safely parse JSON data from elements
+    function safeParseJSON(element, attr) {
+      try {
+        const data = element.getAttribute(attr);
+        return data ? JSON.parse(data) : null;
+      } catch (e) {
+        console.error(`Error parsing ${attr}:`, e);
+        return null;
+      }
+    }
+
+    // Safe get element
+    function safeGetElement(id) {
+      const element = document.getElementById(id);
+      if (!element) {
+        console.warn(`Element with id '${id}' not found`);
+        return null;
+      }
+      return element;
+    }
+
+    const placesElement = safeGetElement("places-data");
+    const places = placesElement ? safeParseJSON(placesElement, "data-places") : [];
+    
+    const distances = safeGetElement("drivers");
+    const coord1Element = safeGetElement("coord1");
+    const coord2Element = safeGetElement("coord2");
+
+    const drivers = {
+      driver1: {
+        distance: distances ? parseFloat(distances.getAttribute("driver1") || 5 * 1609.34) : 5 * 1609.34
+      },
+      driver2: {
+        distance: distances ? parseFloat(distances.getAttribute("driver2") || 5 * 1609.34) : 5 * 1609.34
+      },
+    };
+
+    async function initMap() {
+      const { Map } = await google.maps.importLibrary("maps");
+      const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+      const input1 = document.getElementById("addr1");
+      const input2 = document.getElementById("addr2");
+      const options = { types: ["geocode"] };
+      
+      // Parse coordinates data safely
+      const coord1Data = coord1Element ? safeParseJSON(coord1Element, "coord1") : null;
+      const coord2Data = coord2Element ? safeParseJSON(coord2Element, "coord2") : null;
+
+      // Set up address autocomplete
+      if (input1) new google.maps.places.Autocomplete(input1, options);
+      if (input2) new google.maps.places.Autocomplete(input2, options);
+
+      // Get midpoint coordinates
+      const coordinatesElement = safeGetElement("coordinates");
+      const midpointLat = coordinatesElement ? parseFloat(coordinatesElement.getAttribute("data-lat")) : 0;
+      const midpointLng = coordinatesElement ? parseFloat(coordinatesElement.getAttribute("data-lng")) : 0;
+
+      // Default to a center point if no valid coordinates
+      const midpoint = { 
+        lat: isNaN(midpointLat) ? 40.7128 : midpointLat, 
+        lng: isNaN(midpointLng) ? -74.0060 : midpointLng 
+      };
+
+      // Create map
+      const map = new Map(document.getElementById("map"), {
+        zoom: 10,
+        center: midpoint,
+        mapId: "midpointMap",
+      });
+
+      //console.log("places JS variable:", places);
+
+      const infoWindow = new google.maps.InfoWindow();
+      // Only draw circles if we have valid coordinates
+      if (!isNaN(midpointLat) && !isNaN(midpointLng)) {
+    // Draw distance circles with different colors
+    new google.maps.Circle({
+      strokeColor: "#FF0000", // Red for driver 1
+      strokeOpacity: 0.8,
+      strokeWeight: 2,
+      fillColor: "#FF0000",
+      fillOpacity: 0.15,
+      map: map,
+      center: midpoint,
+      radius: drivers.driver1.distance
+    });
+    
+    new google.maps.Circle({
+      strokeColor: "#0000FF", // Blue for driver 2
+      strokeOpacity: 0.8,
+      strokeWeight: 2,
+      fillColor: "#0000FF",
+      fillOpacity: 0.15,
+      map: map,
+      center: midpoint,
+      radius: drivers.driver2.distance
+    });
+        // Add markers for address points
+        if (coord1Data && coord1Data.latitude !== undefined && coord1Data.longitude !== undefined) {
+          const lat1 = parseFloat(coord1Data.latitude);
+          const lng1 = parseFloat(coord1Data.longitude);
+          const marker = new AdvancedMarkerElement({
+            position: { lat: lat1, lng: lng1 },
+            map: map,
+            title: "Address 1",
+            gmpClickable: true,
+          });
+          
+          marker.addListener("click", () => {
+                // Create content for the info window
+                const contentString = `
+                  <div>
+                    <h3>Address 1</h3>
+                    <p>Location: Latitude ${lat1.toFixed(6)}, Longitude ${lng1.toFixed(6)} </p> 
+                  </div>
+                `;
+                
+                // Set the content and open the info window
+                infoWindow.setContent(contentString);
+                infoWindow.open({
+                  anchor: marker,
+                  map: map
+                });
+              });
+
+        }
+
+        if (coord2Data && coord2Data.latitude !== undefined && coord2Data.longitude !== undefined) {
+          const lat2 = parseFloat(coord2Data.latitude);
+          const lng2 = parseFloat(coord2Data.longitude);
+          const marker = new AdvancedMarkerElement({
+            position: { lat: lat2, lng: lng2 },
+            map: map,
+            title: "Address 2",
+            gmpClickable: true,
+          });
+
+          
+          marker.addListener("click", () => {
+
+                // Create content for the info window
+                const contentString = `
+                  <div>
+                    <h3>Address 2</h3>
+                    <p>Location:  Latitude ${lat2.toFixed(6)}, Longitude ${lng2.toFixed(6)} </p> 
+                  </div>
+                `;
+                
+                // Set the content and open the info window
+                infoWindow.setContent(contentString);
+                infoWindow.open({
+                  anchor: marker,
+                  map: map
+                });
+              });
+
+        }
+
+        // Add midpoint marker
+        const marker = new AdvancedMarkerElement({
+          position: midpoint,
+          map: map,
+          title: "Midpoint",
+          gmpClickable: true,
+        });
+        
+          marker.addListener("click", () => {
+
+            // Create content for the info window
+            const contentString = `
+              <div>
+                <h3>Midpoint</h3>
+                <p>Location:  Latitude ${midpointLat.toFixed(6)}, Longitude ${midpointLng.toFixed(6)} </p> 
+              </div>
+            `;
+
+            // Set the content and open the info window
+            infoWindow.setContent(contentString);
+            infoWindow.open({
+              anchor: marker,
+              map: map
+            });
+          });
+
+
+        // Add place markers
+      
+        
+ // Add place markers with different colors based on radius status
+ if (Array.isArray(places)) {
+      for (const place of places) {
+        if (place.location && place.location.lat !== undefined && place.location.lng !== undefined) {
+          const position = {
+            lat: parseFloat(place.location.lat),
+            lng: parseFloat(place.location.lng)
+          };
+          
+          // Choose marker color based on which radius the place is in
+          let markerColor = "#FF00FF"; // Default purple
+          let radiusInfo = "Unknown";
+          
+          if (place.in_radius === 'both') {
+            markerColor = "#00FF00"; // Green for places in both radii
+            radiusInfo = "In both drivers' radii";
+          } else if (place.in_radius === 'driver1_only_closer_to_driver2') {
+            markerColor = "#FF8000"; // Orange for places only in driver1's radius but closer to driver2
+            radiusInfo = "Only in Driver 1's radius but closer to Driver 2";
+          } else if (place.in_radius === 'driver2_only_closer_to_driver1') {
+            markerColor = "#00FFFF"; // Cyan for places only in driver2's radius but closer to driver1
+            radiusInfo = "Only in Driver 2's radius but closer to Driver 1";
+          }
+          
+          // Create custom marker element with color
+          const markerElement = document.createElement('div');
+          markerElement.innerHTML = `
+            <div style="background-color: ${markerColor}; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white;"></div>
+          `;
+          
+          const marker = new AdvancedMarkerElement({
+            position: position,
+            map: map,
+            title: place.name,
+            content: markerElement,
+            gmpClickable: true,
+          });
+          
+          marker.addListener("click", () => {
+            // Create content for the info window
+            let contentString = `
+              <div>
+                <h3>${place.name}</h3>
+                <p>Location: ${place.location.lat}, ${place.location.lng}</p>
+                <p>Status: ${radiusInfo}</p>
+            `;
+            
+            // Add distance information if available
+            if (place.distance_to_driver1 && place.distance_to_driver2) {
+              contentString += `
+                <p>Distance to Driver 1: ${place.distance_to_driver1}</p>
+                <p>Distance to Driver 2: ${place.distance_to_driver2}</p>
+              `;
+            }
+            
+            contentString += `</div>`;
+            
+            infoWindow.setContent(contentString);
+            infoWindow.open({
+              anchor: marker,
+              map: map
+            });
+          });
+        } else {
+          console.warn("Invalid place location:", place);
+        }
+      }
+    } else {
+      console.warn("Places is not an array or is empty:", places);
+    }
+  }
+}
+    
+    window.initMap = initMap;
+  </script>
+
+  <script
+    async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDA_ZxADAp89anlYWLLYIENka9Zex6BPBw&libraries=places,marker&callback=initMap"
+  ></script>
+</body>
+</html>
