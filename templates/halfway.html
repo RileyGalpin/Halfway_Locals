@@ -4,6 +4,113 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Midpoint Finder</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      max-width: 300px;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    input[type="submit"] {
+      background-color: #007bff;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    input[type="submit"]:hover {
+      background-color: #0056b3;
+    }
+    .error {
+      color: #dc3545;
+      background-color: #f8d7da;
+      border: 1px solid #f5c6cb;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+    }
+    .radio-group {
+      margin: 10px 0;
+    }
+    .radio-group input[type="radio"] {
+      margin-right: 5px;
+    }
+    #map {
+      height: 500px;
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+    .places-list {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      background: white;
+    }
+    .place-item {
+      padding: 10px;
+      border-bottom: 1px solid #eee;
+      margin-bottom: 10px;
+    }
+    .place-item:last-child {
+      border-bottom: none;
+    }
+    .place-name {
+      font-weight: bold;
+      color: #333;
+    }
+    .place-distances {
+      font-size: 14px;
+      color: #666;
+      margin-top: 5px;
+    }
+    .legend {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      margin-bottom: 20px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .legend-color {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      margin-right: 10px;
+      border: 2px solid white;
+    }
+  </style>
 </head>
 <body>
   <h1>Enter Two Addresses</h1>
@@ -13,7 +120,9 @@
     Address 2: <input id="addr2" type="text" name="address2" required><br>
     Driver 2 radius: <input type="number" placeholder="5" value="5" name="driver2"><br><br>
     Place Type: <input id="place" type="text" name="place" value="restaurant" required><br><br>
-    
+    Number of Results: <input id="results" type="number" name="results" value="30" required><br><br>
+
+
     <p>Please select units:</p>
     <input type="radio" id="Miles" name="unit" value="imperial" checked>
     <label for="Miles">Miles</label><br>
@@ -106,7 +215,7 @@
 
       // Create map
       const map = new Map(document.getElementById("map"), {
-        zoom: 10,
+        zoom: 5,
         center: midpoint,
         mapId: "midpointMap",
       });
@@ -306,7 +415,7 @@
   </script>
 
   <script
-    async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDA_ZxADAp89anlYWLLYIENka9Zex6BPBw&libraries=places,marker&callback=initMap"
+    async src="https://maps.googleapis.com/maps/api/js?key=YOURAPIKEY&libraries=places,marker&callback=initMap"
   ></script>
 </body>
 </html>
