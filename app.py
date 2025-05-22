@@ -6,7 +6,7 @@ import json
 
 #TODOS:  draw radii per driver, deal w different cases (driving times, miles vs km, or milage, and be able to return data on miles and driving time)
 # also locate places in area, and have option to load more and filter. maybe be able to share routes? or places?? also display
-GOOGLE_MAPS_API_KEY = "AIzaSyDA_ZxADAp89anlYWLLYIENka9Zex6BPBw"
+GOOGLE_MAPS_API_KEY = "YOUR_API_KEY_HERE"
 gmaps = googlemaps.Client(key=GOOGLE_MAPS_API_KEY)
 
 app = Flask(__name__)
@@ -18,6 +18,7 @@ def index():
     midpoint_long = 0
     driver1 = 5
     driver2 = 5
+    results = 30
     coord1 = {"latitude": 0, "longitude": 0}
     coord2 = {"latitude": 0, "longitude": 0}
     places = []
@@ -39,6 +40,9 @@ def index():
         placetype = request.form.get('place', 'restaurant')
 
         units = request.form.get('unit', 'imperial')
+
+        results = parse_float(request.form.get('results'), 30 )
+        print("results : ", results)
         
         if units == "imperial":
             driver1 *= 1609.34
@@ -54,7 +58,7 @@ def index():
         if not coord1 or not coord2:
             return "<h2>Could not geocode one or both addresses.</h2>"
 
-        midpoint_coords, places = calculate_route_midpoint(addr1, addr2, placetype, units, driver1, driver2)
+        midpoint_coords, places = calculate_route_midpoint(addr1, addr2, placetype, units, driver1, driver2,results)
         if not midpoint_coords:
             return "<h2>Route calculation failed.</h2>"
         
@@ -67,7 +71,7 @@ def index():
             places = places,
             coord1 = coord1,
             coord2 = coord2,
-            units = units,
+            results = results,
             show_map = True
         )
 
@@ -81,7 +85,6 @@ def index():
         places = places,
         coord1 = coord1,
         coord2 = coord2,
-        units = "imperial",
         show_map = True
     )
                            
@@ -121,7 +124,7 @@ def calculate_abolute_midpoint(x1, y1, x2, y2):
     return {"latitude": xmidpoint, "longitude": ymidpoint}
     
 #uses distance matrix api, gets distance in minutes and miles or km from a-b (TEST FOR KM)
-def get_distance_duration(place, address, units = "imperial"):
+def get_distance_duration(place, address, units = "metric"):
     """
     Calculate distance and duration between a place and an address
     
@@ -218,7 +221,7 @@ def get_distance_duration(place, address, units = "imperial"):
 #find locations around the midpoint in the radius of driver 1 and 2
 #driver radius = 0->midpoint + 5 or given
 #use nearby search api
-def find_locals(midpoint_coords, radius_meters, place_type="restaurant", max_results=50):
+def find_locals(midpoint_coords, radius_meters, place_type="restaurant", max_results=30):
     location = f"{midpoint_coords['latitude']},{midpoint_coords['longitude']}"
     base_url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
     params = {
@@ -232,9 +235,12 @@ def find_locals(midpoint_coords, radius_meters, place_type="restaurant", max_res
         response = requests.get(base_url, params=params)
         response.raise_for_status()
         data = response.json()
+        print("results :", max_results)
+        
+        max_results = int(max_results)
 
         if data["status"] == "OK":
-            results = data.get("results", [])[:max_results]
+            results = data.get("results",[])[:max_results]
             places = []
             for place in results:
                 places.append({
@@ -251,7 +257,7 @@ def find_locals(midpoint_coords, radius_meters, place_type="restaurant", max_res
         print(f"Request error: {e}")
         return []  # Return empty list instead of None
 
-def calculate_route_midpoint(addr1, addr2, placetype, units, driver1, driver2):
+def calculate_route_midpoint(addr1, addr2, placetype, units, driver1, driver2,results):
     radius = max(driver1, driver2)  # Use the larger radius for the initial search
     if radius == 0:
         radius = 8000
@@ -303,8 +309,8 @@ def calculate_route_midpoint(addr1, addr2, placetype, units, driver1, driver2):
         midpoint_lat_long = {"latitude": midpoint_coords[0], "longitude": midpoint_coords[1]}
     
         # Find places within each driver's radius
-        places1 = find_locals(midpoint_lat_long, driver1, placetype)
-        places2 = find_locals(midpoint_lat_long, driver2, placetype)
+        places1 = find_locals(midpoint_lat_long, driver1, placetype,results)
+        places2 = find_locals(midpoint_lat_long, driver2, placetype,results)
         
         # Create sets of place names for each radius
         places1_names = {place['name'] for place in places1}
@@ -327,8 +333,8 @@ def calculate_route_midpoint(addr1, addr2, placetype, units, driver1, driver2):
         only_in_radius1 = places1_names - places2_names
         for place in places1:
             if place['name'] in only_in_radius1 and place['name'] not in added_places:
-                distance1 = get_distance_duration(place, origin, units)
-                distance2 = get_distance_duration(place, destination, units)
+                distance1 = get_distance_duration(place, origin, "metric")
+                distance2 = get_distance_duration(place, destination, "metric")
                 
                 if distance1 is None or distance2 is None:
                     print(f"Couldn't get distances for {place['name']}")
@@ -347,8 +353,8 @@ def calculate_route_midpoint(addr1, addr2, placetype, units, driver1, driver2):
         only_in_radius2 = places2_names - places1_names
         for place in places2:
             if place['name'] in only_in_radius2 and place['name'] not in added_places:
-                distance1 = get_distance_duration(place, origin, units)
-                distance2 = get_distance_duration(place, destination, units)
+                distance1 = get_distance_duration(place, origin, "metric")
+                distance2 = get_distance_duration(place, destination, "metric")
                 
                 if distance1 is None or distance2 is None:
                     print(f"Couldn't get distances for {place['name']}")
